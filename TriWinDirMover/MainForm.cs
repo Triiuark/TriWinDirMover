@@ -183,7 +183,7 @@ namespace TriWinDirMover
 			{
 				string cmdDisplay = string.Join("'\n\n", cmds);
 				result = MessageBox.Show(this,
-				"Are you shure you want to run the following commands:\n\n" + cmdDisplay, "Caption",
+				"Are you sure you want to run the following commands:\n\n" + cmdDisplay, "Caption",
 				MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 			}
 
