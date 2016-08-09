@@ -117,7 +117,92 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <metadata name="menuStrip1.TrayLocation" type="System.Drawing.Point, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
-    <value>17, 17</value>
-  </metadata>
+  <data name="Error" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="MainForm" xml:space="preserve">
+    <value>TriWinDirMover</value>
+  </data>
+  <data name="MainFormCommandsFailed" xml:space="preserve">
+    <value>At least one of the following commands failed:
+
+{0}
+</value>
+  </data>
+  <data name="MainFormItemsIsDisabled" xml:space="preserve">
+    <value>Ignore</value>
+  </data>
+  <data name="MainFormItemsIsSymLink" xml:space="preserve">
+    <value>Link</value>
+  </data>
+  <data name="MainFormItemsName" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="MainFormItemsPath" xml:space="preserve">
+    <value>Path</value>
+  </data>
+  <data name="MainFormItemsSize" xml:space="preserve">
+    <value>Size</value>
+  </data>
+  <data name="MainFormItemsTarget" xml:space="preserve">
+    <value>Target</value>
+  </data>
+  <data name="MainFormProcessExecutionFailed" xml:space="preserve">
+    <value>Failed to run process:
+
+{0}</value>
+  </data>
+  <data name="MainFormRefresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="MainFormRunProcessMessageCaption" xml:space="preserve">
+    <value>Warning</value>
+  </data>
+  <data name="MainFormRunProcessMessageConfirm" xml:space="preserve">
+    <value>Do you really want to execute the following commands?
+
+{0}</value>
+  </data>
+  <data name="MainFormSettings" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="SettingsForm" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="SettingsFormDirectorySets" xml:space="preserve">
+    <value>Folder</value>
+  </data>
+  <data name="SettingsFormDirectorySetsSource" xml:space="preserve">
+    <value>Source</value>
+  </data>
+  <data name="SettingsFormDirectorySetsTarget" xml:space="preserve">
+    <value>Target</value>
+  </data>
+  <data name="SettingsFormFlags" xml:space="preserve">
+    <value>Options</value>
+  </data>
+  <data name="SettingsFormKeepCmdOpen" xml:space="preserve">
+    <value>Keep CMD Window Open</value>
+  </data>
+  <data name="SettingsFormPreCommands" xml:space="preserve">
+    <value>Startup Commands</value>
+  </data>
+  <data name="SettingsFormPreCommandsCommand" xml:space="preserve">
+    <value>Command</value>
+  </data>
+  <data name="SettingsFormRunAsAdmin" xml:space="preserve">
+    <value>Run as Administrator</value>
+  </data>
+  <data name="SettingsFormRunPreCommandsAsAdmin" xml:space="preserve">
+    <value>Run Startup Commands as Administrator</value>
+  </data>
+  <data name="SettingsFormSave" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="SettingsFormShowIsDisabled" xml:space="preserve">
+    <value>Display Ignore</value>
+  </data>
+  <data name="SettingsFormSizes" xml:space="preserve">
+    <value>Display Sizes</value>
+  </data>
 </root>

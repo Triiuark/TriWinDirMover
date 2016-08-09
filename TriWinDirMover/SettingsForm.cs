@@ -1,181 +1,213 @@
-﻿using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Collections.Specialized;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System;
 using System.Windows.Forms;
 
 namespace TriWinDirMover
 {
-	public partial class SettingsForm : Form
-	{
-		private DataTable mPreRunCommandsTable;
-		private DataTable mSourcesTable;
+    class SettingsForm : Form
+    {
+        private Settings Settings;
+        private DataGridView DirectorySetsDataGridView;
+        private DataGridView PreCommandsDataGridView;
+        private CheckBox ShowIsDisabledCheckBox;
+        private CheckBox CalculateSizesCheckBox;
+        private CheckBox KeepCmdOpenCheckBox;
+        private CheckBox RunAsAdminCheckBox;
+        private CheckBox RunPreCommandsAsAdminCheckBox;
 
-		public static string ToJson(string[] stringList)
-		{
-			return JsonConvert.SerializeObject(stringList);
-		}
+        public bool HasChanged
+        {
+            get;
+            private set;
+        }
 
-		public static string[] FromJson(string json)
-		{
-			return JsonConvert.DeserializeObject<string[]>(json);
-		}
+        public SettingsForm(Settings settings)
+        {
+            Settings = settings;
+        }
 
-		public static List<string[]> DirSetsFromJson(StringCollection jsonStrings)
-		{
+        public new DialogResult ShowDialog(IWin32Window owner)
+        {
+            if (DirectorySetsDataGridView == null)
+            {
+                InitForm();
+                AddColumns();
+                GetData();
+                MainMenuStrip.Enabled = false;
+            }
+            HasChanged = false;
 
-			List<string[]> dirSets = new List<string[]>();
-			foreach (string json in jsonStrings)
-			{
-				string[] fromJson = FromJson(json);
-				dirSets.Add(fromJson);
-			}
+            DialogResult result = base.ShowDialog(owner);
 
-			return dirSets;
-		}
+            return result;
+        }
 
-		public static List<string[]> GetDirSets()
-		{
-			if (Properties.Settings.Default.directorySets != null)
-			{
-				return DirSetsFromJson(Properties.Settings.Default.directorySets);
-			}
+        private void AddColumns()
+        {
+            DirectorySetsDataGridView.Columns.Add("Source", Properties.Strings.SettingsFormDirectorySetsSource);
+            DirectorySetsDataGridView.Columns.Add("Target", Properties.Strings.SettingsFormDirectorySetsTarget);
+            PreCommandsDataGridView.Columns.Add("Command", Properties.Strings.SettingsFormPreCommandsCommand);
 
-			return null;
-		}
+            DirectorySetsDataGridView.Columns[1].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            PreCommandsDataGridView.Columns[0].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+        }
 
+        private void GetData()
+        {
+            DirectorySetsDataGridView.Rows.Clear();
+            foreach (DirectorySet dirSet in Settings.DirectorySets)
+            {
+                DirectorySetsDataGridView.Rows.Add(new object[] { dirSet.Source.FullName, dirSet.Target.FullName });
+            }
+            PreCommandsDataGridView.Rows.Clear();
+            foreach (string cmd in Settings.PreCommands)
+            {
+                PreCommandsDataGridView.Rows.Add(new object[] { cmd });
+            }
+            CalculateSizesCheckBox.Checked = Settings.CalculateSizes;
+            ShowIsDisabledCheckBox.Checked = Settings.ShowIsDisabled;
+            KeepCmdOpenCheckBox.Checked = Settings.KeepCmdOpen;
+            RunAsAdminCheckBox.Checked = Settings.RunAsAdmin;
+            RunPreCommandsAsAdminCheckBox.Checked = Settings.RunPreCommandsAsAdmin;
+        }
 
-		public SettingsForm()
-		{
-			InitializeComponent();
+        private void InitForm()
+        {
+            ToolStripMenuItem saveToolStripMenuItem = new ToolStripMenuItem(Properties.Strings.SettingsFormSave);
+            saveToolStripMenuItem.Click += SaveToolStripMenuItem_Click;
 
-			this.dataGridView1.DefaultCellStyle.Font = new Font(FontFamily.GenericMonospace, 11);
-			this.dataGridView2.DefaultCellStyle.Font = new Font(FontFamily.GenericMonospace, 11);
+            MainMenuStrip = new MenuStrip();
+            MainMenuStrip.Items.Add(saveToolStripMenuItem);
 
-			GetData();
-		}
+            ShowIsDisabledCheckBox = new CheckBox();
+            ShowIsDisabledCheckBox.Text = Properties.Strings.SettingsFormShowIsDisabled;
+            ShowIsDisabledCheckBox.Dock = DockStyle.Top;
 
-		public void GetData()
-		{
-			mPreRunCommandsTable = new DataTable();
-			mPreRunCommandsTable.Columns.Add("CMD", typeof(string));
-			FillPreCommandsTable();
-			
-			dataGridView1.DataSource = mPreRunCommandsTable;
-			dataGridView1.Columns[dataGridView1.Columns.Count - 1].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-			mPreRunCommandsTable.RowChanged += new DataRowChangeEventHandler(PreRunCommandChanged);
+            CalculateSizesCheckBox = new CheckBox();
+            CalculateSizesCheckBox.Text = Properties.Strings.SettingsFormSizes;
+            CalculateSizesCheckBox.Dock = DockStyle.Top;
 
-			mSourcesTable = new DataTable();
-			mSourcesTable.Columns.Add("Source", typeof(string));
-			mSourcesTable.Columns.Add("Target", typeof(string));
-			FillSourcesTable();
+            KeepCmdOpenCheckBox = new CheckBox();
+            KeepCmdOpenCheckBox.Text = Properties.Strings.SettingsFormKeepCmdOpen;
+            KeepCmdOpenCheckBox.Dock = DockStyle.Top;
 
-			dataGridView2.DataSource = mSourcesTable;
-			dataGridView2.Columns[dataGridView2.Columns.Count - 1].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-			mSourcesTable.RowChanged += new DataRowChangeEventHandler(PreRunCommandChanged);
-		}
+            RunAsAdminCheckBox = new CheckBox();
+            RunAsAdminCheckBox.Text = Properties.Strings.SettingsFormRunAsAdmin;
+            RunAsAdminCheckBox.Dock = DockStyle.Top;
 
-		private void FillPreCommandsTable()
-		{
-			mPreRunCommandsTable.Rows.Clear();
-			if (Properties.Settings.Default.preRunComands != null)
-			{
-				foreach (string cmd in Properties.Settings.Default.preRunComands)
-				{
-					mPreRunCommandsTable.Rows.Add(cmd);
-				}
-			}
-		}
+            RunPreCommandsAsAdminCheckBox = new CheckBox();
+            RunPreCommandsAsAdminCheckBox.Text = Properties.Strings.SettingsFormRunPreCommandsAsAdmin;
+            RunPreCommandsAsAdminCheckBox.Dock = DockStyle.Top;
 
-		private void FillSourcesTable()
-		{
-			mSourcesTable.Rows.Clear();
-			if (Properties.Settings.Default.directorySets != null)
-			{
-				List<string[]> dirSets = DirSetsFromJson(Properties.Settings.Default.directorySets);
+            TableLayoutPanel tableLayoutPanel = new TableLayoutPanel();
+            tableLayoutPanel.RowCount = 3;
+            tableLayoutPanel.ColumnCount = 1;
+            tableLayoutPanel.Dock = DockStyle.Fill;
+            tableLayoutPanel.Controls.Add(CalculateSizesCheckBox);
+            tableLayoutPanel.Controls.Add(ShowIsDisabledCheckBox);
+            tableLayoutPanel.Controls.Add(KeepCmdOpenCheckBox);
+            tableLayoutPanel.Controls.Add(RunAsAdminCheckBox);
+            tableLayoutPanel.Controls.Add(RunPreCommandsAsAdminCheckBox);
 
-				foreach (string[] dirSet in dirSets)
-				{
-					if (dirSet.Length == 2)
-					{
-						mSourcesTable.Rows.Add(dirSet[0], dirSet[1]);
-					}
-					else if (dirSet.Length > 0)
-					{
-						mSourcesTable.Rows.Add(dirSet[0]);
-					}
-				}
-			}
-		}
+            PreCommandsDataGridView = new DataGridView();
+            PreCommandsDataGridView.EditMode = DataGridViewEditMode.EditOnEnter;
 
-		private void PreRunCommandChanged(object sender, DataRowChangeEventArgs args)
-		{
-			Console.WriteLine("Row_Changed Event: name={0}; action={1}", args.Row[0], args.Action);
-		}
+            DirectorySetsDataGridView = new DataGridView();
+            DirectorySetsDataGridView.CellClick += DirectorySetsDataGridView_CellClick;
 
-		private void saveToolStripMenuItem_Click(object sender, EventArgs e)
-		{
-			StringCollection preRunCommands = new StringCollection();
-			StringCollection directorySets  = new StringCollection();
-			foreach (DataRow row in mPreRunCommandsTable.Rows)
-			{
-				try
-				{
-					string s = (string)row[0];
-					if (s != null && s.Length > 0)
-					{
-						preRunCommands.Add(s);
-					}
-				}
-				catch
-				{
-				}
-			}
-			foreach (DataRow row in mSourcesTable.Rows)
-			{
-				try
-				{
+            TabPage directorySetsTabPage = new TabPage();
+            directorySetsTabPage.Controls.Add(DirectorySetsDataGridView);
+            directorySetsTabPage.Text = Properties.Strings.SettingsFormDirectorySets;
 
-					string s = (string)row[0];
-					string t = (string)row[1];
-					if (s != null && s.Length > 0)
-					{
-						string[] r = new string[] { s, t };
+            TabPage preCommandsTabPage = new TabPage();
+            preCommandsTabPage.Text = Properties.Strings.SettingsFormPreCommands;
+            preCommandsTabPage.Controls.Add(PreCommandsDataGridView);
 
-						string jsonString = ToJson(r);
-						directorySets.Add(jsonString);
-					}
-				}
-				catch
-				{
-				}
-			}
-			Properties.Settings.Default.preRunComands = preRunCommands;
-			Properties.Settings.Default.directorySets = directorySets;
-			Properties.Settings.Default.Save();
-			FillPreCommandsTable();
-		}
+            TabPage flagsTabPage = new TabPage();
+            flagsTabPage.Text = Properties.Strings.SettingsFormFlags;
+            flagsTabPage.Controls.Add(tableLayoutPanel);
 
-		private void dataGridView2_CellClick(object sender, DataGridViewCellEventArgs e)
-		{
-			if (e.ColumnIndex > -1 && e.RowIndex > -1)
-			{
-				object value = dataGridView2.Rows[e.RowIndex].Cells[e.ColumnIndex].Value;
-				FolderBrowserDialog folderBrowserDialog1 = new System.Windows.Forms.FolderBrowserDialog();
-				folderBrowserDialog1.SelectedPath = value.ToString();
-				DialogResult result = folderBrowserDialog1.ShowDialog(this);
-				if (result == DialogResult.OK)
-				{
-					dataGridView2.Rows[e.RowIndex].Cells[e.ColumnIndex].Value = folderBrowserDialog1.SelectedPath;
-				}
+            TabControl tabControl = new TabControl();
+            tabControl.Dock = DockStyle.Fill;
+            tabControl.Controls.Add(directorySetsTabPage);
+            tabControl.Controls.Add(preCommandsTabPage);
+            tabControl.Controls.Add(flagsTabPage);
 
-			}
-		}
-	}
+            DirectorySetsDataGridView.CellValueChanged += SettingChanged;
+            DirectorySetsDataGridView.RowsAdded += SettingChanged;
+            DirectorySetsDataGridView.RowsRemoved += SettingChanged;
+            PreCommandsDataGridView.CellValueChanged += SettingChanged;
+            PreCommandsDataGridView.RowsAdded += SettingChanged;
+            PreCommandsDataGridView.RowsRemoved += SettingChanged;
+
+            ShowIsDisabledCheckBox.CheckedChanged += SettingChanged;
+            CalculateSizesCheckBox.CheckedChanged += SettingChanged;
+            KeepCmdOpenCheckBox.CheckedChanged += SettingChanged;
+            RunAsAdminCheckBox.CheckedChanged += SettingChanged;
+            RunPreCommandsAsAdminCheckBox.CheckedChanged += SettingChanged;
+
+            Controls.Add(tabControl);
+            Controls.Add(MainMenuStrip);
+
+            Text = Properties.Strings.SettingsForm;
+            MinimumSize = new System.Drawing.Size(300, 100);
+            Size = new System.Drawing.Size(768, 300);
+        }
+
+        private void SettingChanged(object sender, EventArgs e)
+        {
+            MainMenuStrip.Enabled = true;
+        }
+
+        private void DirectorySetsDataGridView_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.ColumnIndex > -1 && e.RowIndex > -1)
+            {
+                DirectorySetsDataGridView.ShowFolderBrowser(e.RowIndex, e.ColumnIndex);
+            }
+        }
+
+        private void SaveToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (!MainMenuStrip.Enabled)
+            {
+                return;
+            }
+
+            DirectorySetsDataGridView.EndEdit();
+            Settings.PreCommands.Clear();
+            foreach (DataGridViewRow row in PreCommandsDataGridView.Rows)
+            {
+                string s = (string)row.Cells[0].Value;
+                if (s != null && s.Length > 0)
+                {
+                    Settings.PreCommands.Add(s);
+                }
+            }
+
+            PreCommandsDataGridView.EndEdit();
+            Settings.DirectorySets.Clear();
+            foreach (DataGridViewRow row in DirectorySetsDataGridView.Rows)
+            {
+                string s = (string)row.Cells[0].Value;
+                string t = (string)row.Cells[1].Value;
+                if (s != null && s.Length > 0 && t != null && t.Length > 0)
+                {
+                    Settings.DirectorySets.Add(new DirectorySet(s, t));
+                }
+            }
+
+            Settings.CalculateSizes = CalculateSizesCheckBox.Checked;
+            Settings.ShowIsDisabled = ShowIsDisabledCheckBox.Checked;
+            Settings.KeepCmdOpen = KeepCmdOpenCheckBox.Checked;
+            Settings.RunAsAdmin = RunAsAdminCheckBox.Checked;
+            Settings.RunPreCommandsAsAdmin = RunPreCommandsAsAdminCheckBox.Checked;
+
+            Settings.Save();
+
+            GetData();
+
+            MainMenuStrip.Enabled = false;
+            HasChanged = true;
+        }
+    }
 }

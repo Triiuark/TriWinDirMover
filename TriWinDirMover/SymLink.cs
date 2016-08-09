@@ -3,114 +3,113 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
+using System.ComponentModel;
 
 namespace TriWinDirMover
 {
-	public static class SymLink
-	{
-		private const uint ERROR_NOT_A_REPARSE_POINT  = 4390;
-		private const uint FSCTL_GET_REPARSE_POINT    = 0x000900A8;
-		private const uint IO_REPARSE_TAG_SYMLINK     = 0xA000000C;
-		private const uint IO_REPARSE_TAG_MOUNT_POINT = 0xA0000003;
+    public static class SymLink
+    {
+        private const uint ERROR_NOT_A_REPARSE_POINT  = 4390;
+        private const uint FSCTL_GET_REPARSE_POINT    = 0x000900A8;
+        private const uint IO_REPARSE_TAG_SYMLINK     = 0xA000000C;
+        private const uint IO_REPARSE_TAG_MOUNT_POINT = 0xA0000003;
 
-		// generic read
-		private const uint DESIRED_ACCESS = 0x80000000;
+        // generic read
+        private const uint DESIRED_ACCESS = 0x80000000;
 
-		// open existing
-		private const uint CREATION_DISPOSITION = 3;
+        // open existing
+        private const uint CREATION_DISPOSITION = 3;
 
-		// read, write, delete
-		private const uint SHARE_MODE = 1 | 2 | 4;
+        // read, write, delete
+        private const uint SHARE_MODE = 1 | 2 | 4;
 
-		// backup semantics (needed if directory), open reparse point
-		private const uint FLAGS_AND_ATTRIBUTES = 0x02000000 | 0x00200000;
-		
-		[StructLayout(LayoutKind.Sequential)]
-		private struct REPARSE_DATA_BUFFER
-		{
-			public uint  ReparseTag;
-			public ushort ReparseDataLength;
-			public ushort Reserved;
-			public ushort SubstituteNameOffset;
-			public ushort SubstituteNameLength;
-			public ushort PrintNameOffset;
-			public ushort PrintNameLength;
-			
-			[MarshalAs(UnmanagedType.ByValArray, SizeConst = 0x3FF0)]
-			public byte[] PathBuffer;
-		}
+        // backup semantics (needed if directory), open reparse point
+        private const uint FLAGS_AND_ATTRIBUTES = 0x02000000 | 0x00200000;
 
-		[DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-		private static extern bool DeviceIoControl(IntPtr hDevice,
-			uint dwIoControlCode, IntPtr InBuffer, int nInBufferSize,
-			IntPtr OutBuffer, int nOutBufferSize, out int pBytesReturned,
-			IntPtr lpOverlapped);
+        [StructLayout(LayoutKind.Sequential)]
+        private struct REPARSE_DATA_BUFFER
+        {
+            public uint  ReparseTag;
+            public ushort ReparseDataLength;
+            public ushort Reserved;
+            public ushort SubstituteNameOffset;
+            public ushort SubstituteNameLength;
+            public ushort PrintNameOffset;
+            public ushort PrintNameLength;
 
-		[DllImport("kernel32.dll", SetLastError = true)]
-		private static extern IntPtr CreateFile(string lpFileName,
-			uint dwDesiredAccess, uint dwShareMode, IntPtr lpSecurityAttributes,
-			uint dwCreationDisposition, uint dwFlagsAndAttributes,
-			IntPtr hTemplateFile);
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 0x3FF0)]
+            public byte[] PathBuffer;
+        }
 
-		public static string GetTarget(string fileName)
-		{
-			SafeFileHandle handle = new SafeFileHandle(CreateFile(fileName,
-				DESIRED_ACCESS, SHARE_MODE, IntPtr.Zero,
-				CREATION_DISPOSITION, FLAGS_AND_ATTRIBUTES, IntPtr.Zero),
-				true);
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern bool DeviceIoControl(IntPtr hDevice,
+            uint dwIoControlCode, IntPtr InBuffer, int nInBufferSize,
+            IntPtr OutBuffer, int nOutBufferSize, out int pBytesReturned,
+            IntPtr lpOverlapped);
 
-			if (Marshal.GetLastWin32Error() != 0)
-			{
-				throw new IOException("Unable to open reparse point.",
-					Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
-			}
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr CreateFile(string lpFileName,
+            uint dwDesiredAccess, uint dwShareMode, IntPtr lpSecurityAttributes,
+            uint dwCreationDisposition, uint dwFlagsAndAttributes,
+            IntPtr hTemplateFile);
 
-			int outBufferSize = Marshal.SizeOf(typeof(REPARSE_DATA_BUFFER));
-			IntPtr outBuffer = Marshal.AllocHGlobal(outBufferSize);
+        public static string GetTarget(string fileName)
+        {
+            SafeFileHandle handle = new SafeFileHandle(CreateFile(fileName,
+                DESIRED_ACCESS, SHARE_MODE, IntPtr.Zero,
+                CREATION_DISPOSITION, FLAGS_AND_ATTRIBUTES, IntPtr.Zero),
+                true);
 
-			try
-			{
-				int bytesReturned;
-				bool result = DeviceIoControl(handle.DangerousGetHandle(),
-					FSCTL_GET_REPARSE_POINT, IntPtr.Zero, 0,
-					outBuffer, outBufferSize, out bytesReturned, IntPtr.Zero);
+            if (Marshal.GetLastWin32Error() != 0)
+            {
+                string message = new Win32Exception(Marshal.GetLastWin32Error()).Message;
+                throw new IOException(message + " (" + fileName + ")", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
+            }
 
-				if (!result)
-				{
-					if (Marshal.GetLastWin32Error() == ERROR_NOT_A_REPARSE_POINT)
-					{
-						Console.WriteLine(fileName);
-						return null;
-					}
+            int outBufferSize = Marshal.SizeOf(typeof(REPARSE_DATA_BUFFER));
+            IntPtr outBuffer = Marshal.AllocHGlobal(outBufferSize);
 
-					throw new IOException("Unable to get reparse point data.",
-						Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
-				}
+            try
+            {
+                int bytesReturned;
+                bool result = DeviceIoControl(handle.DangerousGetHandle(),
+                    FSCTL_GET_REPARSE_POINT, IntPtr.Zero, 0,
+                    outBuffer, outBufferSize, out bytesReturned, IntPtr.Zero);
 
-				REPARSE_DATA_BUFFER reparseDataBuffer = (REPARSE_DATA_BUFFER)
-					Marshal.PtrToStructure(outBuffer, typeof(REPARSE_DATA_BUFFER));
+                if (!result)
+                {
+                    if (Marshal.GetLastWin32Error() == ERROR_NOT_A_REPARSE_POINT)
+                    {
+                        return null;
+                    }
+                    string message = new Win32Exception(Marshal.GetLastWin32Error()).Message;
+                    throw new IOException(message + " (" + fileName + ")", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
+                }
 
-				ushort offset = reparseDataBuffer.PrintNameOffset;
-				if (reparseDataBuffer.ReparseTag == IO_REPARSE_TAG_SYMLINK)
-				{
-					// + sizeof(uint) for Flags
-					// which I don't have in REPARSE_DATA_BUFFER
-					offset += sizeof(uint);
-				}
-				else if (reparseDataBuffer.ReparseTag != IO_REPARSE_TAG_MOUNT_POINT)
-				{
-					// throw an error?
-				}
-				string targetDir = Encoding.Unicode.GetString(reparseDataBuffer.PathBuffer,
-					offset, reparseDataBuffer.PrintNameLength);
+                REPARSE_DATA_BUFFER reparseDataBuffer = (REPARSE_DATA_BUFFER)
+                    Marshal.PtrToStructure(outBuffer, typeof(REPARSE_DATA_BUFFER));
 
-				return targetDir;
-			}
-			finally
-			{
-				handle.Close();
-				Marshal.FreeHGlobal(outBuffer);
-			}
-		}
-	}
+                ushort offset = reparseDataBuffer.PrintNameOffset;
+                if (reparseDataBuffer.ReparseTag == IO_REPARSE_TAG_SYMLINK)
+                {
+                    // + sizeof(uint) for Flags
+                    // which I don't have in REPARSE_DATA_BUFFER
+                    offset += sizeof(uint);
+                }
+                else if (reparseDataBuffer.ReparseTag != IO_REPARSE_TAG_MOUNT_POINT)
+                {
+                    // throw an error?
+                }
+                string targetDir = Encoding.Unicode.GetString(reparseDataBuffer.PathBuffer,
+                    offset, reparseDataBuffer.PrintNameLength);
+
+                return targetDir;
+            }
+            finally
+            {
+                handle.Close();
+                Marshal.FreeHGlobal(outBuffer);
+            }
+        }
+    }
 }
