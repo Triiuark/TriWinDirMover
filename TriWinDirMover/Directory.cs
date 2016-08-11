@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
@@ -9,6 +9,7 @@ namespace TriWinDirMover
     {
         public struct SizeValue
         {
+
             public const long NotCalculated = -1;
             public const long Calculating = -2;
             public const long Error = -3;

@@ -1,4 +1,4 @@
-﻿namespace TriWinDirMover
+namespace TriWinDirMover
 {
     public class DirectorySet
     {
