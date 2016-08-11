@@ -168,22 +168,40 @@ namespace TriWinDirMover
         private void ApplyRowStyles(DataGridViewRow row)
         {
             Item item = (Item)row.DataBoundItem;
+
+            Color foreColor = Color.Black;
+            Color backColor = Color.White;
+            Color selectionBackColor;
+            int amount = 40;
+            int r;
+            int g;
+            int b;
+
             if (item.IsDisabled)
             {
-                foreach (DataGridViewCell cell in row.Cells)
-                {
-                    cell.Style.ForeColor = Color.Black;
-                    cell.Style.BackColor = Color.LightGray;
-                }
+                foreColor = Color.Black;
+                backColor = Color.LightGray;
             }
             else
             {
-                foreach (DataGridViewCell cell in row.Cells)
-                {
-                    cell.Style.ForeColor = Color.Black;
-                    cell.Style.BackColor = Color.White;
-                }
+                foreColor = Color.Black;
+                backColor = Color.White;
+            }
 
+            foreach (DataGridViewCell cell in row.Cells)
+            {
+                r = cell.Style.BackColor.R < amount ? 0 : cell.Style.BackColor.R - amount;
+                g = cell.Style.BackColor.G < amount ? 0 : cell.Style.BackColor.G - amount;
+                b = cell.Style.BackColor.B;// < amount ? 0 : cell.Style.BackColor.G - amount;
+                selectionBackColor = Color.FromArgb(255, r, g, b);
+                cell.Style.SelectionForeColor = foreColor;
+                cell.Style.BackColor = backColor;
+                cell.Style.SelectionBackColor = selectionBackColor;
+            }
+
+
+            if (!item.IsDisabled)
+            {
                 if (item.IsSymLink)
                 {
                     row.Cells["IsSymlink"].Style.BackColor = Color.LightGreen;
@@ -206,24 +224,16 @@ namespace TriWinDirMover
                     }
                 }
             }
+
             if (item.Size.Equals(Directory.SizeValue.Error))
             {
                 row.Cells["Size"].Style.ForeColor = Color.Red;
             }
+
             if (item.HasError)
             {
                 row.Cells["IsSymLink"].Style.BackColor = Color.LightPink;
                 row.Cells["IsSymLink"].ToolTipText = item.Error;
-            }
-            int amount = 40;
-            foreach (DataGridViewCell cell in row.Cells)
-            {
-                int r = cell.Style.BackColor.R < amount ? 0 : cell.Style.BackColor.R - amount;
-                int g = cell.Style.BackColor.G < amount ? 0 : cell.Style.BackColor.G - amount;
-                int b = cell.Style.BackColor.B;// < amount ? 0 : cell.Style.BackColor.G - amount;
-                Color backColor = Color.FromArgb(255, r, g, b);
-                cell.Style.SelectionForeColor = cell.Style.ForeColor;
-                cell.Style.SelectionBackColor = backColor;
             }
         }
 
@@ -267,6 +277,7 @@ namespace TriWinDirMover
             {
                 Columns["IsDisabled"].Visible = false;
             }
+
             GC.Collect();
         }
 
