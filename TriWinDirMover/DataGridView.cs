@@ -34,7 +34,7 @@ namespace TriWinDirMover
                 Rows[rowIndex].Cells[columnIndex].Value = folderBrowserDialog.SelectedPath;
             }
         }
-        
+
         private void DataGridView_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
         {
             e.Handled = true;

@@ -30,46 +30,51 @@ namespace TriWinDirMover
         {
             get
             {
-                switch (Size)
-                {
-                    case SizeValue.NotCalculated:
-                        return "";
-                    case SizeValue.Calculating:
-                        return "...";
-                    case SizeValue.Error:
-                        return Properties.Strings.Error;
-                }
-
-                int count = 0;
-                double value = Size;
-                while (value > 1024.0 && ++count < 5)
-                {
-                    value /= 1024.0;
-                }
-
-                string result = value.ToString("0.00");
-                switch (count)
-                {
-                    case 0:
-                        result += " B  "; // keep spaces to right align
-                        break;
-                    case 1:
-                        result += " KiB";
-                        break;
-                    case 2:
-                        result += " MiB";
-                        break;
-                    case 3:
-                        result += " GiB";
-                        break;
-                    case 4:
-                    default:
-                        result += " TiB";
-                        break;
-                }
-
-                return result;
+                return ToHumanReadableSize(Size);
             }
+        }
+
+        public static string ToHumanReadableSize(long size)
+        {
+            switch (size)
+            {
+                case SizeValue.NotCalculated:
+                    return "";
+                case SizeValue.Calculating:
+                    return "...";
+                case SizeValue.Error:
+                    return Properties.Strings.Error;
+            }
+
+            int count = 0;
+            double value = size;
+            while (value > 1024.0 && ++count < 5)
+            {
+                value /= 1024.0;
+            }
+
+            string result = value.ToString("0.00");
+            switch (count)
+            {
+                case 0:
+                    result += " B  "; // keep spaces to right align
+                    break;
+                case 1:
+                    result += " KiB";
+                    break;
+                case 2:
+                    result += " MiB";
+                    break;
+                case 3:
+                    result += " GiB";
+                    break;
+                case 4:
+                default:
+                    result += " TiB";
+                    break;
+            }
+
+            return result;
         }
 
         public string Path

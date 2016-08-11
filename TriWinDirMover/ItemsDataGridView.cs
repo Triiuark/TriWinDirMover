@@ -1,9 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Windows.Forms;
 using System.Drawing;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
@@ -12,8 +10,7 @@ namespace TriWinDirMover
     class ItemsDataGridView : DataGridView
     {
         private Settings Settings;
-        private DataGridViewColumn CurrentSortedColumn;
-        private ListSortDirection CurrentSortDirection = ListSortDirection.Ascending;
+        private ItemList ItemList;
 
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -30,11 +27,11 @@ namespace TriWinDirMover
             CellDoubleClick += ItemsDataGridView_CellDoubleClick;
             CurrentCellDirtyStateChanged += ItemsDataGridView_CurrentCellDirtyStateChanged;
             DataBindingComplete += ItemsDataGridView_DataBindingComplete;
-            ColumnHeaderMouseClick += ItemsDataGridView_ColumnHeaderMouseClick;
             CellMouseEnter += ItemsDataGridView_CellMouseEnter;
 
+            ItemList = new ItemList();
             DataSource = new BindingSource();
-            ((BindingSource)DataSource).DataSource = typeof(Item);
+            ((BindingSource)DataSource).DataSource = ItemList;
             ((BindingSource)DataSource).CurrentItemChanged += ItemsDataGridView_CurrentItemChanged;
         }
 
@@ -107,45 +104,6 @@ namespace TriWinDirMover
             process.Start();
         }
 
-        public override void Sort(DataGridViewColumn dataGridViewColumn, ListSortDirection direction)
-        {
-            BindingList<Item> items = (BindingList<Item>)((BindingSource)DataSource).List;
-            List<Item> sorted = new List<Item>();
-            foreach (Item item in items)
-            {
-                sorted.Add(item);
-            }
-
-            int dir = direction == ListSortDirection.Ascending ? 1 : -1;
-            sorted.Sort((x, y) => dir * x.CompareTo(y, dataGridViewColumn.Name));
-
-            ((BindingSource)DataSource).Clear();
-            foreach (Item item in sorted)
-            {
-                ((BindingSource)DataSource).Add(item);
-            }
-
-            CurrentSortedColumn = dataGridViewColumn;
-            CurrentSortDirection = direction;
-            dataGridViewColumn.HeaderCell.SortGlyphDirection =
-                dir == 1 ? SortOrder.Ascending : SortOrder.Descending;
-        }
-
-        private void ItemsDataGridView_ColumnHeaderMouseClick(object sender, DataGridViewCellMouseEventArgs e)
-        {
-            DataGridViewColumn col = Columns[e.ColumnIndex];
-            ListSortDirection direction = ListSortDirection.Ascending;
-            if (col.Equals(CurrentSortedColumn))
-            {
-                if (CurrentSortDirection == ListSortDirection.Ascending)
-                {
-                    direction = ListSortDirection.Descending;
-                }
-            }
-            Sort(col, direction);
-        }
-
-
         private void ItemsDataGridView_DataBindingComplete(object sender, DataGridViewBindingCompleteEventArgs e)
         {
             // only way to get this correct working is this - iterate always over all the rows
@@ -171,11 +129,6 @@ namespace TriWinDirMover
 
             Color foreColor = Color.Black;
             Color backColor = Color.White;
-            Color selectionBackColor;
-            int amount = 40;
-            int r;
-            int g;
-            int b;
 
             if (item.IsDisabled)
             {
@@ -190,15 +143,9 @@ namespace TriWinDirMover
 
             foreach (DataGridViewCell cell in row.Cells)
             {
-                r = cell.Style.BackColor.R < amount ? 0 : cell.Style.BackColor.R - amount;
-                g = cell.Style.BackColor.G < amount ? 0 : cell.Style.BackColor.G - amount;
-                b = cell.Style.BackColor.B;// < amount ? 0 : cell.Style.BackColor.G - amount;
-                selectionBackColor = Color.FromArgb(255, r, g, b);
-                cell.Style.SelectionForeColor = foreColor;
+                cell.Style.ForeColor = foreColor;
                 cell.Style.BackColor = backColor;
-                cell.Style.SelectionBackColor = selectionBackColor;
             }
-
 
             if (!item.IsDisabled)
             {
@@ -212,7 +159,7 @@ namespace TriWinDirMover
                     }
                     else
                     {
-                        row.Cells["Target"].Style.BackColor = Color.LightPink;
+                        row.Cells["Target"].Style.BackColor = Color.LightYellow;
                     }
 
                 }
@@ -220,9 +167,10 @@ namespace TriWinDirMover
                 {
                     if (!item.IsDefaultTarget)
                     {
-                        row.Cells["Target"].Style.ForeColor = Color.Red;
+                        row.Cells["Target"].Style.ForeColor = Color.DarkRed;
                     }
                 }
+                Columns["Size"].ToolTipText = ItemList.SumSizes();
             }
 
             if (item.Size.Equals(Directory.SizeValue.Error))
@@ -235,13 +183,27 @@ namespace TriWinDirMover
                 row.Cells["IsSymLink"].Style.BackColor = Color.LightPink;
                 row.Cells["IsSymLink"].ToolTipText = item.Error;
             }
+
+            Color selectionBackColor;
+            int amount = 40;
+            int r;
+            int g;
+            int b;
+            foreach (DataGridViewCell cell in row.Cells)
+            {
+                r = cell.Style.BackColor.R < amount ? 0 : cell.Style.BackColor.R - amount;
+                g = cell.Style.BackColor.G < amount ? 0 : cell.Style.BackColor.G - amount;
+                b = cell.Style.BackColor.B;// < amount ? 0 : cell.Style.BackColor.G - amount;
+                selectionBackColor = Color.FromArgb(255, r, g, b);
+                cell.Style.SelectionForeColor = cell.Style.ForeColor;
+                cell.Style.SelectionBackColor = selectionBackColor;
+            }
         }
 
         public void GetData()
         {
-            ((BindingSource)DataSource).Clear();
+            ItemList.Clear();
 
-            List<Item> items = new List<Item>();
             foreach (DirectorySet dirSet in Settings.DirectorySets)
             {
                 if (dirSet.Source.HasError)
@@ -251,14 +213,10 @@ namespace TriWinDirMover
                 }
                 foreach (DirectoryInfo dir in dirSet.Source.GetDirectories())
                 {
-                    items.Add(new Item(dir, Settings));
+                    ItemList.Add(new Item(dir, Settings));
                 }
             }
-            items.Sort();
-            foreach (Item item in items)
-            {
-                ((BindingSource)DataSource).Add(item);
-            }
+
 
             if (Settings.CalculateSizes)
             {
@@ -278,7 +236,7 @@ namespace TriWinDirMover
                 Columns["IsDisabled"].Visible = false;
             }
 
-            GC.Collect();
+           ((BindingSource)DataSource).Sort = "Path asc";
         }
 
         private void AddColumns()
@@ -289,21 +247,19 @@ namespace TriWinDirMover
             col.Name = "IsSymLink";
             col.DataPropertyName = "IsSymLink";
             col.HeaderText = Properties.Strings.MainFormItemsIsSymLink;
-            col.SortMode = DataGridViewColumnSortMode.Programmatic;
+            col.SortMode = DataGridViewColumnSortMode.Automatic;
             Columns.Add(col);
 
             col = new DataGridViewTextBoxColumn();
             col.Name = "Path";
             col.DataPropertyName = "Path";
             col.HeaderText = Properties.Strings.MainFormItemsPath;
-            col.SortMode = DataGridViewColumnSortMode.Programmatic;
             Columns.Add(col);
 
             col = new DataGridViewTextBoxColumn();
             col.Name = "Name";
             col.DataPropertyName = "Name";
             col.HeaderText = Properties.Strings.MainFormItemsName;
-            col.SortMode = DataGridViewColumnSortMode.Programmatic;
             Columns.Add(col);
 
             col = new DataGridViewTextBoxColumn();
@@ -311,7 +267,6 @@ namespace TriWinDirMover
             col.DataPropertyName = "Target";
             col.HeaderText = Properties.Strings.MainFormItemsTarget;
             col.MinimumWidth = 60;
-            col.SortMode = DataGridViewColumnSortMode.Programmatic;
             col.ReadOnly = true;
             Columns.Add(col);
 
@@ -320,14 +275,13 @@ namespace TriWinDirMover
             col.DataPropertyName = "HumanReadableSize";
             col.HeaderText = Properties.Strings.MainFormItemsSize;
             col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-            col.SortMode = DataGridViewColumnSortMode.Programmatic;
             Columns.Add(col);
 
             col = new DataGridViewCheckBoxColumn();
             col.Name = "IsDisabled";
             col.DataPropertyName = "IsDisabled";
             col.HeaderText = Properties.Strings.MainFormItemsIsDisabled;
-            col.SortMode = DataGridViewColumnSortMode.Programmatic;
+            col.SortMode = DataGridViewColumnSortMode.Automatic;
             Columns.Add(col);
         }
 

@@ -159,12 +159,12 @@ namespace TriWinDirMover
                     result = Path.CompareTo(item.Path);
                     break;
                 case "Size":
+                case "HumanReadableSize":
                     result = Size.CompareTo(item.Size);
                     break;
                 case "Name":
                     result = Name.CompareTo(item.Name);
                     break;
-
                 case "Target":
                     result = Target.CompareTo(item.Target);
                     break;

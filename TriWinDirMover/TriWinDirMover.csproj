@@ -80,6 +80,7 @@
     </Compile>
     <Compile Include="Directory.cs" />
     <Compile Include="Item.cs" />
+    <Compile Include="ItemList.cs" />
     <Compile Include="ItemsDataGridView.cs">
       <SubType>Component</SubType>
     </Compile>
@@ -117,7 +118,7 @@
     <EmbeddedResource Include="Properties\Strings.de.resx" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
-      <LastGenOutput>Settings1.Designer.cs</LastGenOutput>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
       <SubType>Designer</SubType>
     </None>
     <Compile Include="Properties\Settings.Designer.cs">
