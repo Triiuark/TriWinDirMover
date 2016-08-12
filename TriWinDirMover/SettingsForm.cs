@@ -3,26 +3,26 @@ using System.Windows.Forms;
 
 namespace TriWinDirMover
 {
-	class SettingsForm : Form
+	internal class SettingsForm : Form
 	{
-		private Settings Settings;
-		private DataGridView DirectorySetsDataGridView;
-		private DataGridView PreCommandsDataGridView;
-		private CheckBox ShowIsDisabledCheckBox;
 		private CheckBox CalculateSizesCheckBox;
+		private DataGridView DirectorySetsDataGridView;
 		private CheckBox KeepCmdOpenCheckBox;
+		private DataGridView PreCommandsDataGridView;
 		private CheckBox RunAsAdminCheckBox;
 		private CheckBox RunPreCommandsAsAdminCheckBox;
+		private Settings Settings;
+		private CheckBox ShowIsDisabledCheckBox;
+
+		public SettingsForm(Settings settings)
+		{
+			Settings = settings;
+		}
 
 		public bool HasChanged
 		{
 			get;
 			private set;
-		}
-
-		public SettingsForm(Settings settings)
-		{
-			Settings = settings;
 		}
 
 		public new DialogResult ShowDialog(IWin32Window owner)
@@ -49,6 +49,14 @@ namespace TriWinDirMover
 
 			DirectorySetsDataGridView.Columns[1].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
 			PreCommandsDataGridView.Columns[0].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+		}
+
+		private void DirectorySetsDataGridView_CellClick(object sender, DataGridViewCellEventArgs e)
+		{
+			if (e.ColumnIndex > -1 && e.RowIndex > -1)
+			{
+				DirectorySetsDataGridView.ShowFolderBrowser(e.RowIndex, e.ColumnIndex);
+			}
 		}
 
 		private void GetData()
@@ -153,22 +161,9 @@ namespace TriWinDirMover
 			Size = new System.Drawing.Size(768, 300);
 		}
 
-		private void SettingChanged(object sender, EventArgs e)
-		{
-			MainMenuStrip.Enabled = true;
-		}
-
-		private void DirectorySetsDataGridView_CellClick(object sender, DataGridViewCellEventArgs e)
-		{
-			if (e.ColumnIndex > -1 && e.RowIndex > -1)
-			{
-				DirectorySetsDataGridView.ShowFolderBrowser(e.RowIndex, e.ColumnIndex);
-			}
-		}
-
 		private void SaveToolStripMenuItem_Click(object sender, EventArgs e)
 		{
-			if (!MainMenuStrip.Enabled)
+			if (MainMenuStrip.Enabled)
 			{
 				return;
 			}
@@ -208,6 +203,11 @@ namespace TriWinDirMover
 
 			MainMenuStrip.Enabled = false;
 			HasChanged = true;
+		}
+
+		private void SettingChanged(object sender, EventArgs e)
+		{
+			MainMenuStrip.Enabled = true;
 		}
 	}
 }

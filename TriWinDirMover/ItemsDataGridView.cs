@@ -1,20 +1,16 @@
 using System;
-using System.IO;
-using System.Windows.Forms;
-using System.Drawing;
 using System.Diagnostics;
+using System.Drawing;
+using System.IO;
 using System.Runtime.InteropServices;
+using System.Windows.Forms;
 
 namespace TriWinDirMover
 {
-	class ItemsDataGridView : DataGridView
+	internal class ItemsDataGridView : DataGridView
 	{
-		private Settings Settings;
 		private ItemList ItemList;
-
-		[DllImport("user32.dll")]
-		[return: MarshalAs(UnmanagedType.Bool)]
-		private static extern bool SetForegroundWindow(IntPtr hWnd);
+		private Settings Settings;
 
 		public ItemsDataGridView(Settings settings)
 		{
@@ -35,171 +31,6 @@ namespace TriWinDirMover
 			((BindingSource)DataSource).CurrentItemChanged += ItemsDataGridView_CurrentItemChanged;
 		}
 
-		private void ItemsDataGridView_CellMouseEnter(object sender, DataGridViewCellEventArgs e)
-		{
-			if (e.RowIndex > -1)
-			{
-				ClearSelection();
-				foreach (DataGridViewCell cell in Rows[e.RowIndex].Cells)
-				{
-					cell.Selected = true;
-				}
-			}
-		}
-
-		private void ItemsDataGridView_CellClick(object sender, DataGridViewCellEventArgs e)
-		{
-			if (e.ColumnIndex == 0 && e.RowIndex > -1)
-			{
-				Item item = (Item)Rows[e.RowIndex].DataBoundItem;
-				if (!item.IsDisabled)
-				{
-					item.Move(Parent);
-				}
-			}
-		}
-
-		private void ItemsDataGridView_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
-		{
-			if (e.ColumnIndex > -1 && e.RowIndex > -1)
-			{
-				Item item = (Item)Rows[e.RowIndex].DataBoundItem;
-				switch (Columns[e.ColumnIndex].Name)
-				{
-					case "Target":
-						if (item.IsSymLink)
-						{
-							ShowExplorer(item.Target);
-						}
-						else
-						{
-							ShowFolderBrowser(e.RowIndex, e.ColumnIndex);
-						}
-						break;
-					case "Path":
-						ShowExplorer(item.Path);
-						break;
-					case "Name":
-						ShowExplorer(item.FullName);
-						break;
-				}
-			}
-		}
-
-		private void ShowExplorer(string target)
-		{
-			Process[] processes = Process.GetProcessesByName("explorer");
-			foreach (Process p in processes)
-			{
-				if (p.MainWindowTitle.Equals(target, StringComparison.InvariantCultureIgnoreCase))
-				{
-					SetForegroundWindow(p.MainWindowHandle);
-					return;
-				}
-			}
-
-			Process process = new Process();
-			process.StartInfo.FileName = "explorer";
-			process.StartInfo.Arguments = target;
-			process.Start();
-		}
-
-		private void ItemsDataGridView_DataBindingComplete(object sender, DataGridViewBindingCompleteEventArgs e)
-		{
-			// only way to get this correct working is this - iterate always over all the rows
-			// RowsAdded does not work after BindingSource.Clear();
-			foreach (DataGridViewRow row in Rows)
-			{
-				ApplyRowStyles(row);
-			}
-		}
-
-		private void ItemsDataGridView_CurrentItemChanged(object sender, EventArgs e)
-		{
-			int index = ((BindingSource)sender).Position;
-			if (index >= 0 && index < Rows.Count)
-			{
-				ApplyRowStyles(Rows[index]);
-			}
-		}
-
-		private void ApplyRowStyles(DataGridViewRow row)
-		{
-			Item item = (Item)row.DataBoundItem;
-
-			Color foreColor = Color.Black;
-			Color backColor = Color.White;
-
-			if (item.IsDisabled)
-			{
-				foreColor = Color.Black;
-				backColor = Color.LightGray;
-			}
-			else
-			{
-				foreColor = Color.Black;
-				backColor = Color.White;
-			}
-
-			foreach (DataGridViewCell cell in row.Cells)
-			{
-				cell.Style.ForeColor = foreColor;
-				cell.Style.BackColor = backColor;
-			}
-
-			if (!item.IsDisabled)
-			{
-				if (item.IsSymLink)
-				{
-					row.Cells["IsSymlink"].Style.BackColor = Color.LightGreen;
-
-					if (item.IsDefaultTarget)
-					{
-						row.Cells["Target"].Style.BackColor = Color.LightGreen;
-					}
-					else
-					{
-						row.Cells["Target"].Style.BackColor = Color.LightYellow;
-					}
-
-				}
-				else
-				{
-					if (!item.IsDefaultTarget)
-					{
-						row.Cells["Target"].Style.ForeColor = Color.DarkRed;
-					}
-				}
-				Columns["Size"].ToolTipText = ItemList.SumSizes();
-			}
-
-			if (item.Size.Equals(Directory.SizeValue.Error))
-			{
-				row.Cells["Size"].Style.ForeColor = Color.Red;
-			}
-
-			if (item.HasError)
-			{
-				row.Cells["IsSymLink"].Style.BackColor = Color.LightPink;
-				row.Cells["IsSymLink"].ToolTipText = item.Error;
-			}
-
-			Color selectionBackColor;
-			int amount = 40;
-			int r;
-			int g;
-			int b;
-			foreach (DataGridViewCell cell in row.Cells)
-			{
-				r = cell.Style.BackColor.R < amount ? 0 : cell.Style.BackColor.R - amount;
-				g = cell.Style.BackColor.G < amount ? 0 : cell.Style.BackColor.G - amount;
-				b = cell.Style.BackColor.B;// < amount ? 0 : cell.Style.BackColor.G - amount;
-				selectionBackColor = Color.FromArgb(255, r, g, b);
-				cell.Style.SelectionForeColor = cell.Style.ForeColor;
-				cell.Style.SelectionBackColor = selectionBackColor;
-			}
-		}
-
 		public void GetData()
 		{
 			ItemList.Clear();
@@ -216,7 +47,6 @@ namespace TriWinDirMover
 					ItemList.Add(new Item(dir, Settings));
 				}
 			}
-
 
 			if (Settings.CalculateSizes)
 			{
@@ -238,6 +68,10 @@ namespace TriWinDirMover
 
 		   ((BindingSource)DataSource).Sort = "Path asc";
 		}
+
+		[DllImport("user32.dll")]
+		[return: MarshalAs(UnmanagedType.Bool)]
+		private static extern bool SetForegroundWindow(IntPtr hWnd);
 
 		private void AddColumns()
 		{
@@ -285,10 +119,176 @@ namespace TriWinDirMover
 			Columns.Add(col);
 		}
 
+		private void ApplyRowStyles(DataGridViewRow row)
+		{
+			Item item = (Item)row.DataBoundItem;
+
+			Color foreColor = Color.Black;
+			Color backColor = Color.White;
+
+			if (item.IsDisabled)
+			{
+				foreColor = Color.Black;
+				backColor = Color.LightGray;
+			}
+			else
+			{
+				foreColor = Color.Black;
+				backColor = Color.White;
+			}
+
+			foreach (DataGridViewCell cell in row.Cells)
+			{
+				cell.Style.ForeColor = foreColor;
+				cell.Style.BackColor = backColor;
+			}
+
+			if (!item.IsDisabled)
+			{
+				if (item.IsSymLink)
+				{
+					row.Cells["IsSymlink"].Style.BackColor = Color.LightGreen;
+
+					if (item.IsDefaultTarget)
+					{
+						row.Cells["Target"].Style.BackColor = Color.LightGreen;
+					}
+					else
+					{
+						row.Cells["Target"].Style.BackColor = Color.LightYellow;
+					}
+				}
+				else
+				{
+					if (!item.IsDefaultTarget)
+					{
+						row.Cells["Target"].Style.ForeColor = Color.DarkRed;
+					}
+				}
+				Columns["Size"].ToolTipText = ItemList.SumSizes();
+			}
+
+			if (item.Size.Equals(Directory.SizeValue.Error))
+			{
+				row.Cells["Size"].Style.ForeColor = Color.Red;
+			}
+
+			if (item.HasError)
+			{
+				row.Cells["IsSymLink"].Style.BackColor = Color.LightPink;
+				row.Cells["IsSymLink"].ToolTipText = item.Error;
+			}
+
+			Color selectionBackColor;
+			int amount = 40;
+			int r;
+			int g;
+			int b;
+			foreach (DataGridViewCell cell in row.Cells)
+			{
+				r = cell.Style.BackColor.R < amount ? 0 : cell.Style.BackColor.R - amount;
+				g = cell.Style.BackColor.G < amount ? 0 : cell.Style.BackColor.G - amount;
+				b = cell.Style.BackColor.B;// < amount ? 0 : cell.Style.BackColor.G - amount;
+				selectionBackColor = Color.FromArgb(255, r, g, b);
+				cell.Style.SelectionForeColor = cell.Style.ForeColor;
+				cell.Style.SelectionBackColor = selectionBackColor;
+			}
+		}
+
+		private void ItemsDataGridView_CellClick(object sender, DataGridViewCellEventArgs e)
+		{
+			if (e.ColumnIndex == 0 && e.RowIndex > -1)
+			{
+				Item item = (Item)Rows[e.RowIndex].DataBoundItem;
+				if (!item.IsDisabled)
+				{
+					item.Move(Parent);
+				}
+			}
+		}
+
+		private void ItemsDataGridView_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+		{
+			if (e.ColumnIndex > -1 && e.RowIndex > -1)
+			{
+				Item item = (Item)Rows[e.RowIndex].DataBoundItem;
+				switch (Columns[e.ColumnIndex].Name)
+				{
+					case "Target":
+						if (item.IsSymLink)
+						{
+							ShowExplorer(item.Target);
+						}
+						else
+						{
+							ShowFolderBrowser(e.RowIndex, e.ColumnIndex);
+						}
+						break;
+
+					case "Path":
+						ShowExplorer(item.Path);
+						break;
+
+					case "Name":
+						ShowExplorer(item.FullName);
+						break;
+				}
+			}
+		}
+
+		private void ItemsDataGridView_CellMouseEnter(object sender, DataGridViewCellEventArgs e)
+		{
+			if (e.RowIndex > -1)
+			{
+				ClearSelection();
+				foreach (DataGridViewCell cell in Rows[e.RowIndex].Cells)
+				{
+					cell.Selected = true;
+				}
+			}
+		}
+
 		private void ItemsDataGridView_CurrentCellDirtyStateChanged(object sender, EventArgs e)
 		{
 			// to immediately submit changes to the Item objects
 			CommitEdit(DataGridViewDataErrorContexts.Commit);
+		}
+
+		private void ItemsDataGridView_CurrentItemChanged(object sender, EventArgs e)
+		{
+			int index = ((BindingSource)sender).Position;
+			if (index >= 0 && index < Rows.Count)
+			{
+				ApplyRowStyles(Rows[index]);
+			}
+		}
+
+		private void ItemsDataGridView_DataBindingComplete(object sender, DataGridViewBindingCompleteEventArgs e)
+		{
+			// only way to get this correct working is this - iterate always over all the rows
+			// RowsAdded does not work after BindingSource.Clear();
+			foreach (DataGridViewRow row in Rows)
+			{
+				ApplyRowStyles(row);
+			}
+		}
+
+		private void ShowExplorer(string target)
+		{
+			Process[] processes = Process.GetProcessesByName("explorer");
+			foreach (Process p in processes)
+			{
+				if (p.MainWindowTitle.Equals(target, StringComparison.InvariantCultureIgnoreCase))
+				{
+					SetForegroundWindow(p.MainWindowHandle);
+					return;
+				}
+			}
+
+			Process process = new Process();
+			process.StartInfo.FileName = "explorer";
+			process.StartInfo.Arguments = target;
+			process.Start();
 		}
 	}
 }

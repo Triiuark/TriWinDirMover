@@ -1,7 +1,13 @@
 namespace TriWinDirMover
 {
-	public class DirectorySet
+	internal class DirectorySet
 	{
+		public DirectorySet(string source, string target)
+		{
+			Source = new Directory(source);
+			Target = new Directory(target);
+		}
+
 		public Directory Source
 		{
 			get;
@@ -14,20 +20,14 @@ namespace TriWinDirMover
 			private set;
 		}
 
-		public DirectorySet(string source, string target)
+		public override bool Equals(object obj)
 		{
-			Source = new Directory(source);
-			Target = new Directory(target);
+			return GetHashCode().Equals(obj.GetHashCode());
 		}
 
 		public override int GetHashCode()
 		{
 			return Source.FullName.GetHashCode();
-		}
-
-		public override bool Equals(object obj)
-		{
-			return GetHashCode().Equals(obj.GetHashCode());
 		}
 	}
 }

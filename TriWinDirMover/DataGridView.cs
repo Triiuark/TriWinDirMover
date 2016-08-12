@@ -3,7 +3,7 @@ using System.Windows.Forms;
 
 namespace TriWinDirMover
 {
-	class DataGridView : System.Windows.Forms.DataGridView
+	internal class DataGridView : System.Windows.Forms.DataGridView
 	{
 		public DataGridView()
 		{
@@ -22,6 +22,7 @@ namespace TriWinDirMover
 		public void ShowFolderBrowser(int rowIndex, int columnIndex)
 		{
 			object value = Rows[rowIndex].Cells[columnIndex].Value;
+
 			FolderBrowserDialog folderBrowserDialog = new FolderBrowserDialog();
 			if (value != null)
 			{

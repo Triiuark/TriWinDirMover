@@ -3,11 +3,28 @@ using System.Collections.Specialized;
 
 namespace TriWinDirMover
 {
-	class Settings
+	internal class Settings
 	{
-		private static char DIRECTORY_SET_SPLIT_CHARACTER = '|';
+		public bool CalculateSizes;
+		public bool KeepCmdOpen;
+		public bool RunAsAdmin;
+		public bool RunPreCommandsAsAdmin;
+		public bool ShowIsDisabled;
 
+		private static char DIRECTORY_SET_SPLIT_CHARACTER = '|';
 		private static Settings InstanceValue;
+
+		private Settings()
+		{
+			Load();
+		}
+
+		~Settings()
+		{
+			SetDisabledItems();
+			Properties.Settings.Default.Save();
+		}
+
 		public static Settings Instance
 		{
 			get
@@ -18,18 +35,6 @@ namespace TriWinDirMover
 				}
 				return InstanceValue;
 			}
-		}
-
-		public bool CalculateSizes;
-		public bool ShowIsDisabled;
-		public bool KeepCmdOpen;
-		public bool RunAsAdmin;
-		public bool RunPreCommandsAsAdmin;
-
-		public StringCollection PreCommands
-		{
-			get;
-			private set;
 		}
 
 		public HashSet<DirectorySet> DirectorySets
@@ -44,15 +49,25 @@ namespace TriWinDirMover
 			private set;
 		}
 
-		private Settings()
+		public StringCollection PreCommands
 		{
-			Load();
+			get;
+			private set;
 		}
 
-		~Settings()
+		public DirectorySet GetDirectorySet(string source)
 		{
-			SetDisabledItems();
-			Properties.Settings.Default.Save();
+			DirectorySet result = null;
+			foreach (DirectorySet dirSet in DirectorySets)
+			{
+				if (dirSet.Source.FullName.Equals(source))
+				{
+					result = dirSet;
+					break;
+				}
+			}
+
+			return result;
 		}
 
 		public void Load()
@@ -111,21 +126,6 @@ namespace TriWinDirMover
 			{
 				Properties.Settings.Default.DisabledItems.Add(s);
 			}
-		}
-
-		public DirectorySet GetDirectorySet(string source)
-		{
-			DirectorySet result = null;
-			foreach (DirectorySet dirSet in DirectorySets)
-			{
-				if (dirSet.Source.FullName.Equals(source))
-				{
-					result = dirSet;
-					break;
-				}
-			}
-
-			return result;
 		}
 	}
 }

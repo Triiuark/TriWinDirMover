@@ -2,26 +2,48 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
+
 namespace TriWinDirMover
 {
 	// Note: can't derive from sealed type System.IO.DirectoryInfo
-	public class Directory : INotifyPropertyChanged
+	internal class Directory : INotifyPropertyChanged
 	{
-		public struct SizeValue
-		{
+		protected DirectoryInfo Info;
+		protected BackgroundWorker SizeBackgroundWorker;
 
-			public const long NotCalculated = -1;
-			public const long Calculating = -2;
-			public const long Error = -3;
+		private string TargetValue;
+
+		public Directory(string path) : this(new DirectoryInfo(path))
+		{
 		}
 
-		public bool IsSizeCalculated
+		public Directory(DirectoryInfo directoryInfo)
+		{
+			Init(directoryInfo);
+		}
+
+		~Directory()
+		{
+			StopCalculateSize();
+		}
+
+		public event PropertyChangedEventHandler PropertyChanged;
+
+		public string Error
 		{
 			get;
 			protected set;
 		}
 
-		public long Size
+		public string FullName
+		{
+			get
+			{
+				return Info.FullName;
+			}
+		}
+
+		public bool HasError
 		{
 			get;
 			protected set;
@@ -35,14 +57,74 @@ namespace TriWinDirMover
 			}
 		}
 
+		public bool IsSizeCalculated
+		{
+			get;
+			protected set;
+		}
+
+		public bool IsSymLink
+		{
+			get;
+			protected set;
+		}
+
+		public string Name
+		{
+			get
+			{
+				return Info.Name;
+			}
+		}
+
+		public string Path
+		{
+			get
+			{
+				return Info.Parent.FullName;
+			}
+		}
+
+		public string Root
+		{
+			get
+			{
+				return Info.Root.FullName;
+			}
+		}
+
+		public long Size
+		{
+			get;
+			protected set;
+		}
+
+		public string Target
+		{
+			get
+			{
+				return TargetValue;
+			}
+			set
+			{
+				if (!IsSymLink)
+				{
+					TargetValue = value;
+					OnPropertyChanged("Target");
+				}
+			}
+		}
+
 		public static string ToHumanReadableSize(long size)
 		{
 			switch (size)
 			{
 				case SizeValue.NotCalculated:
 					return "";
+
 				case SizeValue.Calculating:
 					return "...";
+
 				case SizeValue.Error:
 					return Properties.Strings.Error;
 			}
@@ -60,15 +142,19 @@ namespace TriWinDirMover
 				case 0:
 					result += " B  "; // keep spaces to right align
 					break;
+
 				case 1:
 					result += " KiB";
 					break;
+
 				case 2:
 					result += " MiB";
 					break;
+
 				case 3:
 					result += " GiB";
 					break;
+
 				case 4:
 				default:
 					result += " TiB";
@@ -78,77 +164,36 @@ namespace TriWinDirMover
 			return result;
 		}
 
-		public string Path
+		public void CalculateSize()
 		{
-			get
+			if (HasError)
 			{
-				return Info.Parent.FullName;
+				IsSizeCalculated = true;
+				Size = SizeValue.Error;
+				OnPropertyChanged("Size");
+				return;
+			}
+
+			IsSizeCalculated = false;
+			Size = SizeValue.Calculating;
+			if (SizeBackgroundWorker == null)
+			{
+				SizeBackgroundWorker = new BackgroundWorker();
+				SizeBackgroundWorker.WorkerSupportsCancellation = true;
+				SizeBackgroundWorker.DoWork += SizeBackgroundWorker_DoWork;
+				SizeBackgroundWorker.RunWorkerCompleted += SizeBackgroundWorker_RunWorkerCompleted;
+				SizeBackgroundWorker.RunWorkerAsync(this);
 			}
 		}
 
-		public string Name
+		public IEnumerable<DirectoryInfo> GetDirectories()
 		{
-			get
-			{
-				return Info.Name;
-			}
+			return Info.GetDirectories();
 		}
 
-		public string FullName
+		public void StopCalculateSize()
 		{
-			get
-			{
-				return Info.FullName;
-			}
-		}
-
-		private string TargetValue;
-		public string Target
-		{
-			get
-			{
-				return TargetValue;
-			}
-			set
-			{
-				if (!IsSymLink)
-				{
-					TargetValue = value;
-					OnPropertyChanged("Target");
-				}
-			}
-		}
-
-		public bool IsSymLink
-		{
-			get;
-			protected set;
-		}
-
-		public bool HasError
-		{
-			get;
-			protected set;
-		}
-
-		public string Error
-		{
-			get;
-			protected set;
-		}
-
-		public event PropertyChangedEventHandler PropertyChanged;
-
-		protected DirectoryInfo Info;
-		protected BackgroundWorker SizeBackgroundWorker;
-
-		public Directory(string path) : this(new DirectoryInfo(path))
-		{
-		}
-
-		public Directory(DirectoryInfo directoryInfo)
-		{
-			Init(directoryInfo);
+			SizeBackgroundWorker?.CancelAsync();
 		}
 
 		protected void Init(DirectoryInfo directoryInfo)
@@ -203,43 +248,6 @@ namespace TriWinDirMover
 			}
 		}
 
-		~Directory()
-		{
-			StopCalculateSize();
-		}
-
-		public IEnumerable<DirectoryInfo> GetDirectories()
-		{
-			return Info.GetDirectories();
-		}
-
-		public void CalculateSize()
-		{
-			if (HasError)
-			{
-				IsSizeCalculated = true;
-				Size = SizeValue.Error;
-				OnPropertyChanged("Size");
-				return;
-			}
-
-			IsSizeCalculated = false;
-			Size = SizeValue.Calculating;
-			if (SizeBackgroundWorker == null)
-			{
-				SizeBackgroundWorker = new BackgroundWorker();
-				SizeBackgroundWorker.WorkerSupportsCancellation = true;
-				SizeBackgroundWorker.DoWork += SizeBackgroundWorker_DoWork;
-				SizeBackgroundWorker.RunWorkerCompleted += SizeBackgroundWorker_RunWorkerCompleted;
-				SizeBackgroundWorker.RunWorkerAsync(this);
-			}
-		}
-
-		public void StopCalculateSize()
-		{
-			SizeBackgroundWorker?.CancelAsync();
-		}
-
 		protected void OnPropertyChanged(string name)
 		{
 			PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
@@ -287,6 +295,13 @@ namespace TriWinDirMover
 			}
 
 			OnPropertyChanged("Size");
+		}
+
+		public struct SizeValue
+		{
+			public const long Calculating = -2;
+			public const long Error = -3;
+			public const long NotCalculated = -1;
 		}
 	}
 }
