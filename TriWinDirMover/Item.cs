@@ -2,19 +2,26 @@ using System;
 using System.ComponentModel;
 using System.IO;
 using System.Text.RegularExpressions;
-using System.Windows.Forms;
+using System.Threading.Tasks;
 
 namespace TriWinDirMover
 {
 	internal class Item : Directory, IComparable
 	{
+		private static int MAX_READ_BYTES = 10 * 1024 * 1024;
+		private static int MAX_THREADS = 32;
+
+		private BackgroundWorker CopyBackgroundWorker;
 		private DirectorySet DirectorySet;
 		private bool IsDisabledValue;
 		private Settings Settings;
+		private BackgroundWorker SizeBackgroundWorker;
 
 		public Item(DirectoryInfo directoryInfo, Settings settings) : base(directoryInfo)
 		{
+			State = new ItemState();
 			Settings = settings;
+			IsSizeCalculating = true;
 			IsDisabledValue = Settings.DisabledItems.Contains(Info.FullName);
 			DirectorySet = Settings.GetDirectorySet(Path);
 			if (DirectorySet == null)
@@ -33,38 +40,42 @@ namespace TriWinDirMover
 				Target = "";
 			}
 
+			PropertyChanged += Item_PropertyChanged;
 			CalculateSize();
+		}
 
-			PropertyChanged += delegate (object sender, PropertyChangedEventArgs e)
+		public double AverageFileSize
+		{
+			get
 			{
-				if (Size > -1)
+				double size = 0;
+				if (State.TotalFiles > 0)
 				{
-					DriveInfo driveInfo;
-					if (IsSymLink)
-					{
-						driveInfo = new DriveInfo(DirectorySet.Source.Root);
-					}
-					else
-					{
-						driveInfo = new DriveInfo(Target);
-					}
+					size = State.TotalSize / State.TotalFiles;
+				}
 
-					if (driveInfo.AvailableFreeSpace < Size)
-					{
-						HasError = true;
-						Error = "Not enough space to move directory.";
-					}
-					else if (Error.Equals("Not enough space to move directory."))
-					{
-						HasError = false;
-						Error = "";
-					}
-				}
-				if (e.PropertyName.Equals("Size"))
+				return size;
+			}
+		}
+
+		public string HumanReadableAverageFileSize
+		{
+			get
+			{
+				if (IsDisabled)
 				{
-					OnPropertyChanged("HumanReadableSize");
+					return "";
 				}
-			};
+				return ToHumanReadableSize(AverageFileSize);
+			}
+		}
+
+		public string HumanReadableSize
+		{
+			get
+			{
+				return ToHumanReadableSize(State.TotalSize);
+			}
 		}
 
 		public bool IsDefaultTarget
@@ -96,7 +107,7 @@ namespace TriWinDirMover
 				OnPropertyChanged("IsDisabled");
 				if (IsDisabledValue)
 				{
-					StopCalculateSize();
+					//StopCalculateSize();
 					Settings.DisabledItems.Add(Info.FullName);
 				}
 				else
@@ -107,11 +118,78 @@ namespace TriWinDirMover
 			}
 		}
 
-		public new void CalculateSize()
+		public bool IsSizeCalculating
 		{
-			if (Settings.CalculateSizes && !IsDisabled)
+			get;
+			private set;
+		}
+
+		public int NumberOfDirectories
+		{
+			get
 			{
-				base.CalculateSize();
+				return State.TotalDirectories;
+			}
+		}
+
+		public int NumberOfFiles
+		{
+			get
+			{
+				return State.TotalFiles;
+			}
+		}
+
+		public long Size
+		{
+			get
+			{
+				return State.TotalSize;
+			}
+		}
+
+		public ItemState State
+		{
+			get;
+			private set;
+		}
+
+		public static string ToHumanReadableSize(double size)
+		{
+			string result = "";
+
+			if (size == ItemState.SizeValue.Error)
+			{
+				result = Properties.Strings.Error;
+			}
+			else if (size >= 0)
+			{
+				int count = 0;
+				string[] units = new string[] { "B  ", "KiB", "MiB", "GiB", "TiB" };
+				while (size > 1024.0 && ++count < 5)
+				{
+					size /= 1024.0;
+				}
+
+				result = size.ToString("0.00") + " " + units[count];
+			}
+
+			return result;
+		}
+
+		public void CalculateSize()
+		{
+			if (!IsDisabled && Settings.CalculateSizes)
+			{
+				if (SizeBackgroundWorker == null)
+				{
+					SizeBackgroundWorker = new BackgroundWorker();
+					SizeBackgroundWorker.WorkerSupportsCancellation = true;
+					SizeBackgroundWorker.DoWork += SizeBackgroundWorker_DoWork;
+					SizeBackgroundWorker.RunWorkerCompleted += SizeBackgroundWorker_RunWorkerCompleted;
+				}
+				IsSizeCalculating = true;
+				SizeBackgroundWorker.RunWorkerAsync(this);
 			}
 		}
 
@@ -138,6 +216,19 @@ namespace TriWinDirMover
 				case "Size":
 				case "HumanReadableSize":
 					result = Size.CompareTo(item.Size);
+					break;
+
+				case "AverageFileSize":
+				case "HumanReadableAverageFileSize":
+					result = AverageFileSize.CompareTo(item.AverageFileSize);
+					break;
+
+				case "NumberOfFiles":
+					result = NumberOfFiles.CompareTo(item.NumberOfFiles);
+					break;
+
+				case "NumberOfDirectories":
+					result = NumberOfDirectories.CompareTo(item.NumberOfDirectories);
 					break;
 
 				case "Name":
@@ -177,6 +268,152 @@ namespace TriWinDirMover
 			return CompareTo(obj, null);
 		}
 
+		public void CopyBackgroundWorker_DoWork(object sender, DoWorkEventArgs e)
+		{
+			string source;
+			string target;
+
+			if (IsSymLink)
+			{
+				source = Target;
+				target = Regex.Replace(Path + "\\" + Name, "\\\\", "\\");
+			}
+			else
+			{
+				source = FullName;
+				target = Regex.Replace(Target + "\\" + Name, "\\\\", "\\");
+			}
+
+			ParallelOptions parallelOptions = new ParallelOptions();
+			parallelOptions.MaxDegreeOfParallelism = MAX_THREADS;
+
+			State.Reset();
+			CalculateMySize(new DirectoryInfo(source), parallelOptions);
+
+			if (new DirectoryInfo(target).Exists)
+			{
+				if (IsSymLink)
+				{
+					target += ".bak";
+				}
+				else
+				{
+					return;
+				}
+			}
+
+			Parallel.ForEach(State.getDirectoryList(), parallelOptions, (directory) =>
+			{
+				System.IO.Directory.CreateDirectory(
+					directory.Replace(source, target));
+				State.DirectoryCreated();
+			});
+
+			Parallel.ForEach(State.GetFileList(), parallelOptions, (file) =>
+			{
+				long size = new FileInfo(file).Length;
+				string newFile = file.Replace(source, target);
+				byte[] bytes = new byte[MAX_READ_BYTES];
+
+				FileStream s = File.OpenRead(file);
+				FileStream t = File.Create(newFile);
+
+				int bytesRead = 0;
+				while ((bytesRead = s.Read(bytes, 0, MAX_READ_BYTES)) > 0)
+				{
+					t.Write(bytes, 0, bytesRead);
+					State.AddSize(bytesRead);
+				}
+				s.Close();
+				t.Close();
+				State.FileCopied();
+			});
+
+			State.Clear();
+		}
+
+		public void MoveItem()
+		{
+			if (CopyBackgroundWorker == null)
+			{
+				CopyBackgroundWorker = new BackgroundWorker();
+				CopyBackgroundWorker.WorkerSupportsCancellation = true;
+				CopyBackgroundWorker.DoWork +=
+					CopyBackgroundWorker_DoWork;
+				CopyBackgroundWorker.RunWorkerCompleted +=
+					CopyBackgroundWorker_RunWorkerCompleted;
+			}
+			CopyBackgroundWorker.RunWorkerAsync(this);
+		}
+
+		private void CalculateMySize(DirectoryInfo source, ParallelOptions parallelOptions)
+		{
+			Parallel.ForEach(source.GetDirectories(), parallelOptions, (dir) =>
+			{
+				State.AddDir(dir.FullName);
+				CalculateMySize(dir, parallelOptions);
+			});
+
+			Parallel.ForEach(source.GetFiles(), parallelOptions, (file) =>
+			{
+				State.AddFile(file.FullName);
+				State.AddToTotalSize(new FileInfo(file.FullName).Length);
+			});
+		}
+
+		private void CopyBackgroundWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+		{
+		}
+
+		private void Item_PropertyChanged(object sender, PropertyChangedEventArgs e)
+		{
+			if (Size >= 0)
+			{
+				DriveInfo driveInfo;
+				if (IsSymLink)
+				{
+					driveInfo = new DriveInfo(DirectorySet.Source.Root);
+				}
+				else
+				{
+					driveInfo = new DriveInfo(Target);
+				}
+
+				if (driveInfo.AvailableFreeSpace < Size)
+				{
+					HasError = true;
+					Error = "Not enough space to move directory.";
+				}
+				else if (Error.Equals("Not enough space to move directory."))
+				{
+					HasError = false;
+					Error = "";
+				}
+			}
+			if (e.PropertyName.Equals("Size"))
+			{
+				OnPropertyChanged("HumanReadableSize");
+			};
+		}
+
+		private void SizeBackgroundWorker_DoWork(object sender, DoWorkEventArgs e)
+		{
+			ParallelOptions opt = new ParallelOptions();
+			opt.MaxDegreeOfParallelism = MAX_THREADS;
+
+			State.Reset();
+			CalculateMySize(Info, opt);
+			State.Clear();
+		}
+
+		private void SizeBackgroundWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+		{
+			State.Clear();
+			IsSizeCalculating = false;
+			OnPropertyChanged("Size");
+		}
+
+		/*
 		public void Move(IWin32Window parent)
 		{
 			if (HasError)
@@ -223,5 +460,6 @@ namespace TriWinDirMover
 			}
 			OnPropertyChanged("IsSymLink");
 		}
+		*/
 	}
 }

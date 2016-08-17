@@ -163,7 +163,7 @@ namespace TriWinDirMover
 
 		private void SaveToolStripMenuItem_Click(object sender, EventArgs e)
 		{
-			if (MainMenuStrip.Enabled)
+			if (!MainMenuStrip.Enabled)
 			{
 				return;
 			}

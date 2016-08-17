@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 
@@ -8,6 +9,24 @@ namespace TriWinDirMover
 		private bool IsSortedCoreValue;
 		private ListSortDirection SortDirectionCoreValue;
 		private PropertyDescriptor SortPropertyCoreValue;
+
+		public int TotalDirectories
+		{
+			get;
+			private set;
+		}
+
+		public int TotalFiles
+		{
+			get;
+			private set;
+		}
+
+		public long TotalSize
+		{
+			get;
+			private set;
+		}
 
 		protected override bool IsSortedCore
 		{
@@ -44,7 +63,9 @@ namespace TriWinDirMover
 		public string SumSizes()
 		{
 			List<Item> items = Items as List<Item>;
-			long sum = 0;
+			TotalDirectories = 0;
+			TotalFiles = 0;
+			TotalSize = 0;
 			bool isReady = true;
 			if (items != null)
 			{
@@ -52,9 +73,11 @@ namespace TriWinDirMover
 				{
 					if (!item.IsDisabled)
 					{
-						if (item.IsSizeCalculated)
+						if (!item.IsSizeCalculating)
 						{
-							sum += item.Size;
+							TotalSize += item.Size;
+							TotalDirectories += item.NumberOfDirectories;
+							TotalFiles += item.NumberOfFiles;
 						}
 						else
 						{
@@ -63,7 +86,7 @@ namespace TriWinDirMover
 					}
 				}
 			}
-			return Directory.ToHumanReadableSize(sum) + (isReady ? "" : " ...");
+			return Item.ToHumanReadableSize(TotalSize) + (isReady ? "" : " ...");
 		}
 
 		protected override void ApplySortCore(PropertyDescriptor property,

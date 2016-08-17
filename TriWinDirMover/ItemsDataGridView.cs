@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -51,10 +52,14 @@ namespace TriWinDirMover
 			if (Settings.CalculateSizes)
 			{
 				Columns["Size"].Visible = true;
+				Columns["Directories"].Visible = true;
+				Columns["Files"].Visible = true;
 			}
 			else
 			{
 				Columns["Size"].Visible = false;
+				Columns["Directories"].Visible = false;
+				Columns["Files"].Visible = false;
 			}
 
 			if (Settings.ShowIsDisabled)
@@ -111,6 +116,27 @@ namespace TriWinDirMover
 			col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
 			Columns.Add(col);
 
+			col = new DataGridViewTextBoxColumn();
+			col.Name = "Directories";
+			col.DataPropertyName = "NumberOfDirectories";
+			col.HeaderText = Properties.Strings.MainFormItemsSize;
+			col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+			Columns.Add(col);
+
+			col = new DataGridViewTextBoxColumn();
+			col.Name = "Files";
+			col.DataPropertyName = "NumberOfFiles";
+			col.HeaderText = Properties.Strings.MainFormItemsSize;
+			col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+			Columns.Add(col);
+
+			col = new DataGridViewTextBoxColumn();
+			col.Name = "AverageFileSize";
+			col.DataPropertyName = "HumanReadableAverageFileSize";
+			col.HeaderText = Properties.Strings.MainFormItemsSize;
+			col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+			Columns.Add(col);
+
 			col = new DataGridViewCheckBoxColumn();
 			col.Name = "IsDisabled";
 			col.DataPropertyName = "IsDisabled";
@@ -122,7 +148,6 @@ namespace TriWinDirMover
 		private void ApplyRowStyles(DataGridViewRow row)
 		{
 			Item item = (Item)row.DataBoundItem;
-
 			Color foreColor = Color.Black;
 			Color backColor = Color.White;
 
@@ -166,17 +191,32 @@ namespace TriWinDirMover
 					}
 				}
 				Columns["Size"].ToolTipText = ItemList.SumSizes();
+				Columns["Directories"].ToolTipText = ItemList.TotalDirectories.ToString()
+					+ " / " + Item.ToHumanReadableSize(ItemList.TotalSize / (ItemList.TotalDirectories > 0 ? ItemList.TotalDirectories : 1));
+				Columns["Files"].ToolTipText = ItemList.TotalFiles.ToString()
+					+ " / " + Item.ToHumanReadableSize(ItemList.TotalSize / (ItemList.TotalFiles > 0 ? ItemList.TotalFiles : 1));
 			}
 
-			if (item.Size.Equals(Directory.SizeValue.Error))
+			if (item.Size.Equals(ItemState.SizeValue.Error))
 			{
 				row.Cells["Size"].Style.ForeColor = Color.Red;
 			}
+			row.Cells["Size"].ToolTipText =
+				"Files: " + item.NumberOfFiles +
+				Environment.NewLine +
+				"Directories: " + item.NumberOfDirectories;
 
 			if (item.HasError)
 			{
 				row.Cells["IsSymLink"].Style.BackColor = Color.LightPink;
 				row.Cells["IsSymLink"].ToolTipText = item.Error;
+			}
+
+			if (Settings.CalculateSizes && item.IsSizeCalculating)
+			{
+				row.Cells["Size"].Style.ForeColor = Color.DarkGray;
+				row.Cells["Directories"].Style.ForeColor = Color.DarkGray;
+				row.Cells["Files"].Style.ForeColor = Color.DarkGray;
 			}
 
 			Color selectionBackColor;
@@ -202,7 +242,70 @@ namespace TriWinDirMover
 				Item item = (Item)Rows[e.RowIndex].DataBoundItem;
 				if (!item.IsDisabled)
 				{
-					item.Move(Parent);
+					Stopwatch watch = new Stopwatch();
+					System.Timers.Timer timer = new System.Timers.Timer(400);
+					timer.Elapsed += (timerSender, timerEventArgs) =>
+					{
+						ItemState copyState = item.State;
+						long totalElements = copyState.TotalDirectories + copyState.TotalFiles;
+						long currentElements = copyState.Directories + copyState.Files;
+						TimeSpan ts = watch.Elapsed;
+
+						double elementsPerSecond = currentElements * 1000.0 / watch.ElapsedMilliseconds;
+						double bytesPerSecond = copyState.Size * 1000.0 / watch.ElapsedMilliseconds;
+
+						double estimatedElements = 0;
+						double estimatedSize = 0;
+						if (elementsPerSecond > 0)
+						{
+							estimatedElements = (totalElements - currentElements) / elementsPerSecond;
+						}
+						if (bytesPerSecond > 0)
+						{
+							estimatedSize = (copyState.TotalSize - copyState.Size) / bytesPerSecond;
+						}
+
+						int value = 0;
+						string text = "";
+						string elapsed = ts.ToString("d\\ hh\\:mm\\:ss\\.f");
+						if (copyState.TotalSize > 0 && copyState.Size > -1)
+						{
+							value = (int)(copyState.Size * 1000.0 / copyState.TotalSize);
+							text += Item.ToHumanReadableSize(copyState.TotalSize) + " / " + Item.ToHumanReadableSize(copyState.TotalSize - copyState.Size);
+						}
+						else if (copyState.Size == -1)
+						{
+							text = "...";
+						}
+						text += " / " + Item.ToHumanReadableSize((long)bytesPerSecond) + "/s / " + estimatedSize.ToString("0.00") + "s / " + elapsed;
+
+						((MainForm)Parent).SetSizeProgress(value, text);
+
+						value = 0;
+						text = "";
+						if (totalElements > 0 && currentElements > -1)
+						{
+							value = (int)(currentElements * 1000.0 / totalElements);
+							text = totalElements + " / " + (totalElements - currentElements) + " / " + elementsPerSecond.ToString("0.00") + " Elements/s";
+						}
+						else if (currentElements == -1)
+						{
+							text = "...";
+						}
+						((MainForm)Parent).SetElementProgress(value, text);
+
+						if (currentElements > -1 && totalElements == currentElements)
+						{
+							timer.Stop();
+							return;
+						}
+					};
+					timer.Start();
+					watch.Start();
+					item.MoveItem();
+					//item.CurrentCopyState.PropertyChanged += CurrentCopyState_PropertyChanged;
+					//CurrentCopyState.PropertyChanged += R_PropertyChanged;
+					//item.Move(Parent);
 				}
 			}
 		}
@@ -289,6 +392,11 @@ namespace TriWinDirMover
 			process.StartInfo.FileName = "explorer";
 			process.StartInfo.Arguments = target;
 			process.Start();
+		}
+
+		private void Timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+		{
+			throw new NotImplementedException();
 		}
 	}
 }

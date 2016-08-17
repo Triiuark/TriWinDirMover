@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 
 namespace TriWinDirMover
@@ -9,8 +10,6 @@ namespace TriWinDirMover
 	internal class Directory : INotifyPropertyChanged
 	{
 		protected DirectoryInfo Info;
-		protected BackgroundWorker SizeBackgroundWorker;
-
 		private string TargetValue;
 
 		public Directory(string path) : this(new DirectoryInfo(path))
@@ -20,11 +19,6 @@ namespace TriWinDirMover
 		public Directory(DirectoryInfo directoryInfo)
 		{
 			Init(directoryInfo);
-		}
-
-		~Directory()
-		{
-			StopCalculateSize();
 		}
 
 		public event PropertyChangedEventHandler PropertyChanged;
@@ -44,20 +38,6 @@ namespace TriWinDirMover
 		}
 
 		public bool HasError
-		{
-			get;
-			protected set;
-		}
-
-		public string HumanReadableSize
-		{
-			get
-			{
-				return ToHumanReadableSize(Size);
-			}
-		}
-
-		public bool IsSizeCalculated
 		{
 			get;
 			protected set;
@@ -93,12 +73,6 @@ namespace TriWinDirMover
 			}
 		}
 
-		public long Size
-		{
-			get;
-			protected set;
-		}
-
 		public string Target
 		{
 			get
@@ -115,92 +89,14 @@ namespace TriWinDirMover
 			}
 		}
 
-		public static string ToHumanReadableSize(long size)
-		{
-			switch (size)
-			{
-				case SizeValue.NotCalculated:
-					return "";
-
-				case SizeValue.Calculating:
-					return "...";
-
-				case SizeValue.Error:
-					return Properties.Strings.Error;
-			}
-
-			int count = 0;
-			double value = size;
-			while (value > 1024.0 && ++count < 5)
-			{
-				value /= 1024.0;
-			}
-
-			string result = value.ToString("0.00");
-			switch (count)
-			{
-				case 0:
-					result += " B  "; // keep spaces to right align
-					break;
-
-				case 1:
-					result += " KiB";
-					break;
-
-				case 2:
-					result += " MiB";
-					break;
-
-				case 3:
-					result += " GiB";
-					break;
-
-				case 4:
-				default:
-					result += " TiB";
-					break;
-			}
-
-			return result;
-		}
-
-		public void CalculateSize()
-		{
-			if (HasError)
-			{
-				IsSizeCalculated = true;
-				Size = SizeValue.Error;
-				OnPropertyChanged("Size");
-				return;
-			}
-
-			IsSizeCalculated = false;
-			Size = SizeValue.Calculating;
-			if (SizeBackgroundWorker == null)
-			{
-				SizeBackgroundWorker = new BackgroundWorker();
-				SizeBackgroundWorker.WorkerSupportsCancellation = true;
-				SizeBackgroundWorker.DoWork += SizeBackgroundWorker_DoWork;
-				SizeBackgroundWorker.RunWorkerCompleted += SizeBackgroundWorker_RunWorkerCompleted;
-				SizeBackgroundWorker.RunWorkerAsync(this);
-			}
-		}
-
 		public IEnumerable<DirectoryInfo> GetDirectories()
 		{
 			return Info.GetDirectories();
 		}
 
-		public void StopCalculateSize()
-		{
-			SizeBackgroundWorker?.CancelAsync();
-		}
-
 		protected void Init(DirectoryInfo directoryInfo)
 		{
 			Info = directoryInfo;
-			Size = SizeValue.NotCalculated;
-			IsSizeCalculated = false;
 			HasError = false;
 			Error = "";
 			try
@@ -215,7 +111,8 @@ namespace TriWinDirMover
 
 			IsSymLink = false;
 			TargetValue = Info.FullName;
-			if ((Info.Attributes & FileAttributes.ReparsePoint) == FileAttributes.ReparsePoint)
+			if ((Info.Attributes & FileAttributes.ReparsePoint) ==
+				FileAttributes.ReparsePoint)
 			{
 				// TODO could also be something different
 				IsSymLink = true;
@@ -251,57 +148,6 @@ namespace TriWinDirMover
 		protected void OnPropertyChanged(string name)
 		{
 			PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-		}
-
-		private void SizeBackgroundWorker_DoWork(object sender, DoWorkEventArgs e)
-		{
-			Directory dir = (Directory)e.Argument;
-			long result = 0;
-			try
-			{
-				foreach (string f in System.IO.Directory.GetFiles(dir.FullName, "*", SearchOption.AllDirectories))
-				{
-					if (((BackgroundWorker)sender).CancellationPending)
-					{
-						e.Cancel = true;
-						break;
-					}
-					result += (new FileInfo(f)).Length;
-				}
-			}
-			catch (Exception ex)
-			{
-				Error = ex.Message;
-				result = SizeValue.Error;
-			}
-			e.Result = result;
-		}
-
-		private void SizeBackgroundWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
-		{
-			if (!e.Cancelled)
-			{
-				Size = (long)e.Result;
-				if (Size == SizeValue.Error)
-				{
-					HasError = true;
-				}
-				IsSizeCalculated = true;
-			}
-			else
-			{
-				Size = SizeValue.NotCalculated;
-				IsSizeCalculated = false;
-			}
-
-			OnPropertyChanged("Size");
-		}
-
-		public struct SizeValue
-		{
-			public const long Calculating = -2;
-			public const long Error = -3;
-			public const long NotCalculated = -1;
 		}
 	}
 }
